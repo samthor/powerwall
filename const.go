@@ -79,8 +79,9 @@ func GetSimpleStatus(ctx context.Context, td *TEDApi) (status *SimpleStatus, err
 				Reasons    []string `json:"reasons"`
 			} `json:"siteShutdown"`
 			SystemStatus struct {
-				NominalEnergyRemainingWh int `json:"nominalEnergyRemainingWh"`
-				NominalFullPackEnergyWh  int `json:"nominalFullPackEnergyWh"`
+				// these usually show up as int but rarely have e.g., .0000000004
+				NominalEnergyRemainingWh float64 `json:"nominalEnergyRemainingWh"`
+				NominalFullPackEnergyWh  float64 `json:"nominalFullPackEnergyWh"`
 			} `json:"systemStatus"`
 		} `json:"control"`
 		// TODO: get voltage etc
@@ -104,8 +105,8 @@ func GetSimpleStatus(ctx context.Context, td *TEDApi) (status *SimpleStatus, err
 	status = &SimpleStatus{
 		Shutdown:          response.Control.SiteShutdown.IsShutdown,
 		Island:            !response.Control.Islanding.ContactorClosed,
-		BatteryEnergy:     response.Control.SystemStatus.NominalEnergyRemainingWh,
-		BatteryFullEnergy: response.Control.SystemStatus.NominalFullPackEnergyWh,
+		BatteryEnergy:     int(response.Control.SystemStatus.NominalEnergyRemainingWh),
+		BatteryFullEnergy: int(response.Control.SystemStatus.NominalFullPackEnergyWh),
 		PowerBattery:      powerFor("BATTERY"),
 		PowerSite:         powerFor("SITE"),
 		PowerLoad:         powerFor("LOAD"),
