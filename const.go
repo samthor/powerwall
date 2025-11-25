@@ -3,6 +3,7 @@ package powerwall
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 )
 
 // these are the three queries from pypowerwall (from some kind of extraction from firmware)
@@ -31,17 +32,25 @@ var (
 )
 
 type SimpleStatus struct {
-	Shutdown          bool    `json:"shutdown"`
-	Island            bool    `json:"island"`
-	BatteryEnergy     int     `json:"battery"`
-	BatteryFullEnergy int     `json:"batteryFull"`
-	PowerBattery      float64 `json:"powerBattery"`
-	PowerSite         float64 `json:"powerSite"`
-	PowerLoad         float64 `json:"powerLoad"`
-	PowerSolar        float64 `json:"powerSolar"`
-	PowerSolarRGM     float64 `json:"powerSolarRGM"`
-	PowerGenerator    float64 `json:"powerGenerator"`
-	PowerConductor    float64 `json:"powerConductor"`
+	Shutdown          bool           `json:"shutdown"`
+	Island            bool           `json:"island"`
+	BatteryEnergy     int            `json:"battery"`
+	BatteryFullEnergy int            `json:"batteryFull"`
+	PowerBattery      float64        `json:"powerBattery"`
+	PowerSite         float64        `json:"powerSite"`
+	PowerLoad         float64        `json:"powerLoad"`
+	PowerSolar        float64        `json:"powerSolar"`
+	PowerSolarRGM     float64        `json:"powerSolarRGM"`
+	PowerGenerator    float64        `json:"powerGenerator"`
+	PowerConductor    float64        `json:"powerConductor"`
+	Phase             [3]SimplePhase `json:"phase"`
+}
+
+type SimplePhase struct {
+	FreqLoad    float64 `json:"freqLoad"`
+	FreqMain    float64 `json:"freqMain"`
+	VoltageLoad float64 `json:"voltageLoad"`
+	VoltageMain float64 `json:"voltageMain"`
 }
 
 // GetSimpleStatus reads a [SimpleStatus] struct from your Powerwall.
@@ -84,7 +93,14 @@ func GetSimpleStatus(ctx context.Context, td *TEDApi) (status *SimpleStatus, err
 				NominalFullPackEnergyWh  float64 `json:"nominalFullPackEnergyWh"`
 			} `json:"systemStatus"`
 		} `json:"control"`
-		// TODO: get voltage etc
+
+		EsCan struct {
+			Bus struct {
+				Islander struct {
+					AcMeasurements map[string]any `json:"ISLAND_AcMeasurements"`
+				} `json:"ISLANDER"`
+			} `json:"bus"`
+		} `json:"esCan"`
 	}
 	var response statusResponse
 
@@ -92,6 +108,11 @@ func GetSimpleStatus(ctx context.Context, td *TEDApi) (status *SimpleStatus, err
 	if err != nil {
 		return nil, err
 	}
+
+	// var raw map[string]any
+	// json.Unmarshal(out, &raw)
+	// nice, _ := json.MarshalIndent(raw, "", "  ")
+	// fmt.Printf("%s\n", string(nice))
 
 	powerFor := func(s string) float64 {
 		for _, m := range response.Control.MeterAggregates {
@@ -115,6 +136,25 @@ func GetSimpleStatus(ctx context.Context, td *TEDApi) (status *SimpleStatus, err
 		PowerGenerator:    powerFor("GENERATOR"),
 		PowerConductor:    powerFor("CONDUCTOR"),
 	}
+
+	for i := range 3 {
+		phase := i + 1
+
+		ac := response.EsCan.Bus.Islander.AcMeasurements
+		floatFor := func(s string) (out float64) {
+			out, _ = ac[s].(float64)
+			return
+		}
+
+		status.Phase[i] = SimplePhase{
+			FreqLoad:    floatFor(fmt.Sprintf("ISLAND_FreqL%d_Load", phase)),
+			FreqMain:    floatFor(fmt.Sprintf("ISLAND_FreqL%d_Main", phase)),
+			VoltageLoad: floatFor(fmt.Sprintf("ISLAND_VL%dN_Load", phase)),
+			VoltageMain: floatFor(fmt.Sprintf("ISLAND_VL%dN_Main", phase)),
+		}
+
+	}
+
 	return status, nil
 }
 

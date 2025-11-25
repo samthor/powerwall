@@ -28,14 +28,14 @@ func ptrTo[X any](x X) *X {
 }
 
 const (
-	DefaultHost = "192.168.91.1"
+	DefaultRemote = "192.168.91.1:443"
 )
 
 // TEDApi specifies how to connect to a Powerwall.
 type TEDApi struct {
 	DIN    string // DIN of target, will be transparently fetched if not provided
 	Secret string // must be provided, typically printed under your Powerwall's casing
-	Host   string // default "192.168.91.1" if unspecified
+	Remote string // default "192.168.91.1:443" if unspecified
 
 	lock        sync.Mutex
 	internalDIN string // transparently fetched if DIN not provided
@@ -141,11 +141,11 @@ func (td *TEDApi) Config(ctx context.Context, file string) (out []byte, err erro
 
 func (td *TEDApi) buildUrl(pathname string) (url string) {
 	// use default _or_ overwritten host
-	host := DefaultHost
-	if td.Host != "" {
-		host = td.Host
+	remote := DefaultRemote
+	if td.Remote != "" {
+		remote = td.Remote
 	}
-	return fmt.Sprintf("https://%s%s", host, pathname)
+	return fmt.Sprintf("https://%s%s", remote, pathname)
 }
 
 // getDIN returns the user-provided DIN, or does a cached lookup on the device's DIN by making an API request.
