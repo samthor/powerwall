@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/samthor/powerwall"
@@ -24,6 +25,18 @@ func main() {
 	status, err := powerwall.GetSimpleStatus(context.Background(), api)
 	if err != nil {
 		log.Fatalf("could not read status: %v", err)
+	}
+
+	byDevice := map[string]powerwall.SimpleDeviceStatus{}
+	if len(status.BatteryBlocks) > 1 {
+		// demo fetches individual devices only if you have multiple
+		for _, din := range status.BatteryBlocks {
+			res, err := powerwall.GetSimpleDeviceStatus(context.Background(), api, din)
+			if err != nil {
+				log.Fatalf("failed to lookup device %s: %v", din, err)
+			}
+			byDevice[din] = *res
+		}
 	}
 
 	batteryDuration := "effectively idle"
@@ -54,15 +67,32 @@ func main() {
 
 	log.Printf("")
 	log.Printf("System (Island=%v, Shutdown=%v)", status.Island, status.Shutdown)
-	log.Printf("Battery: %.2f%% (%.2f / %.2f kWh), %s", float64(status.BatteryEnergy)/float64(status.BatteryFullEnergy)*100.0, float64(status.BatteryEnergy)/1000.0, float64(status.BatteryFullEnergy)/1000.0, batteryDuration)
+	log.Printf("%.2f%% (%.2f / %.2f kWh), %s", float64(status.BatteryEnergy)/float64(status.BatteryFullEnergy)*100.0, float64(status.BatteryEnergy)/1000.0, float64(status.BatteryFullEnergy)/1000.0, batteryDuration)
 	log.Printf("")
-	log.Printf("SOLAR   %6.2f kW", status.PowerSolar/1000.0)
-	log.Printf("LOAD    %6.2f kW", status.PowerLoad/1000.0)
-	log.Printf("GATE    %6.2f kW%s", status.PowerSite/1000.0, siteSuffix)
-	log.Printf("BATTERY %6.2f kW%s", status.PowerBattery/1000.0, batterySuffix)
+	log.Printf("SOLAR   %s", powerwall.FormatPowerTable(status.PowerSolar))
+	log.Printf("BATTERY %s%s", powerwall.FormatPowerTable(status.PowerBattery), batterySuffix)
+	log.Printf("GATE    %s%s", powerwall.FormatPowerTable(status.PowerSite), siteSuffix)
+	log.Printf("LOAD    %s", powerwall.FormatPowerTable(status.PowerLoad))
 	log.Printf("")
 	for i, phase := range status.Phase {
 		log.Printf("[%d] %6.2fv %5.2fHz", (i + 1), phase.VoltageLoad, phase.FreqLoad)
+	}
+
+	for _, din := range status.BatteryBlocks {
+		status := byDevice[din]
+
+		var mpptParts []string
+		for _, mppt := range status.MPPT {
+			mpptParts = append(mpptParts, mppt.FormatPower())
+		}
+
+		log.Printf("")
+		log.Printf("[%s] %.2f%% (%.2f / %.2f kWh)", din, float64(status.BatteryEnergy)/float64(status.BatteryFullEnergy)*100.0, float64(status.BatteryEnergy)/1000.0, float64(status.BatteryFullEnergy)/1000.0)
+		log.Printf("")
+		log.Printf("  SOLAR   %s (%s)", powerwall.FormatPowerTable(status.PowerSolar), strings.Join(mpptParts, " "))
+		log.Printf("  BATTERY %s", powerwall.FormatPowerTable(status.PowerBattery))
+		log.Printf("")
+		log.Printf("  %6.2fv %5.2fHz", status.Voltage, status.Freq)
 	}
 	log.Printf("")
 

@@ -91,6 +91,16 @@ func (td *TEDApi) QueryDevice(ctx context.Context, q Query, customDin string) (o
 		Tail: &Tail{Value: 1},
 	}
 
+	if customDin != "" {
+		// if we're targeting another DIN, we need info on the primary
+		primaryDin, err := td.getDIN(ctx)
+		if err != nil {
+			return nil, err
+		}
+		pbReq.Tail.Value = 2
+		pbReq.Message.Sender.Id = &Participant_Din{Din: primaryDin}
+	}
+
 	var pbRes Message
 	err = td.internalMessagePost(ctx, &pbReq, &pbRes, customDin)
 	if err != nil {
@@ -187,6 +197,7 @@ func (td *TEDApi) internalMessagePost(ctx context.Context, in *Message, out *Mes
 
 	body, err := td.internalRequest(ctx, pathname, bytes.NewBuffer(b))
 	if err != nil {
+		log.Printf("got err=%v", err)
 		return err
 	}
 
