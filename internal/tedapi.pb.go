@@ -13,7 +13,7 @@
 // 	protoc        v6.32.0
 // source: tools/tedapi/tedapi.proto
 
-package powerwall
+package internal
 
 import (
 	reflect "reflect"

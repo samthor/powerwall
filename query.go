@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/samthor/powerwall/internal"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -74,21 +75,21 @@ func (td *TEDApi) QueryDevice(ctx context.Context, q Query, customDin string) (o
 		}
 	}
 
-	pbReq := Message{
-		Message: &MessageEnvelope{
+	pbReq := internal.Message{
+		Message: &internal.MessageEnvelope{
 			DeliveryChannel: 1,
-			Sender:          &Participant{Id: &Participant_Local{Local: 1}},
-			Recipient:       &Participant{Id: &Participant_Din{Din: recipientDin}},
-			Payload: &QueryType{
-				Send: &PayloadQuerySend{
+			Sender:          &internal.Participant{Id: &internal.Participant_Local{Local: 1}},
+			Recipient:       &internal.Participant{Id: &internal.Participant_Din{Din: recipientDin}},
+			Payload: &internal.QueryType{
+				Send: &internal.PayloadQuerySend{
 					Num:     ptrTo(int32(2)),
-					Payload: &PayloadString{Value: 1, Text: q.Query},
+					Payload: &internal.PayloadString{Value: 1, Text: q.Query},
 					Code:    q.Signature,
-					B:       &StringValue{Value: string(vars)},
+					B:       &internal.StringValue{Value: string(vars)},
 				},
 			},
 		},
-		Tail: &Tail{Value: 1},
+		Tail: &internal.Tail{Value: 1},
 	}
 
 	if customDin != "" {
@@ -98,10 +99,10 @@ func (td *TEDApi) QueryDevice(ctx context.Context, q Query, customDin string) (o
 			return nil, err
 		}
 		pbReq.Tail.Value = 2
-		pbReq.Message.Sender.Id = &Participant_Din{Din: primaryDin}
+		pbReq.Message.Sender.Id = &internal.Participant_Din{Din: primaryDin}
 	}
 
-	var pbRes Message
+	var pbRes internal.Message
 	err = td.internalMessagePost(ctx, &pbReq, &pbRes, customDin)
 	if err != nil {
 		return nil, err
@@ -123,21 +124,21 @@ func (td *TEDApi) Config(ctx context.Context, file string) (out []byte, err erro
 		return nil, err
 	}
 
-	pbReq := Message{
-		Message: &MessageEnvelope{
+	pbReq := internal.Message{
+		Message: &internal.MessageEnvelope{
 			DeliveryChannel: 1,
-			Sender:          &Participant{Id: &Participant_Local{Local: 1}},
-			Recipient:       &Participant{Id: &Participant_Din{Din: din}},
-			Config: &ConfigType{
-				Config: &ConfigType_Send{
-					Send: &PayloadConfigSend{Num: 1, File: file},
+			Sender:          &internal.Participant{Id: &internal.Participant_Local{Local: 1}},
+			Recipient:       &internal.Participant{Id: &internal.Participant_Din{Din: din}},
+			Config: &internal.ConfigType{
+				Config: &internal.ConfigType_Send{
+					Send: &internal.PayloadConfigSend{Num: 1, File: file},
 				},
 			},
 		},
-		Tail: &Tail{Value: 1},
+		Tail: &internal.Tail{Value: 1},
 	}
 
-	var pbRes Message
+	var pbRes internal.Message
 	err = td.internalMessagePost(ctx, &pbReq, &pbRes, "")
 	if err != nil {
 		return nil, err
@@ -183,7 +184,7 @@ func (td *TEDApi) getDIN(ctx context.Context) (din string, err error) {
 	return td.internalDIN, nil
 }
 
-func (td *TEDApi) internalMessagePost(ctx context.Context, in *Message, out *Message, customDin string) (err error) {
+func (td *TEDApi) internalMessagePost(ctx context.Context, in *internal.Message, out *internal.Message, customDin string) (err error) {
 	pathname := "/tedapi/v1"
 	if customDin != "" {
 		// used to target specific PW devices for some queries
